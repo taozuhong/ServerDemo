@@ -1,0 +1,11 @@
+syntax="proto2";
+
+message TimeStamp {
+    required string Time = 1;
+    required uint64 Tick = 2;
+}
+
+message HeartMsg {
+    required uint32 Tick = 1;
+}
+

@@ -1,0 +1,10 @@
+
+Compile server:
+g++ -o timesvr -g -O0 -std=c++11 -l protobuf -l event -l gflags -l glog -I. TimeSchema.pb.h TimeSchema.pb.cc server/timesvr.cc
+
+
+Compile client:
+g++ -o tc -g -O0 -std=c++11 -l protobuf -I /usr/include/google/protobuf TimeSchema.pb.h TimeSchema.pb.cc client/client.cc
+
+
+
