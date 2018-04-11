@@ -30,12 +30,13 @@ typedef std::string stlstring;
 
 class ServerCore {
 private:
-    bool m_DebugMode = false;
+    bool m_debugMode = false;
+    bool m_forkMode = false;
 
     // Libevent data struct declare
-    struct event_base *m_EventBase = nullptr;
-    struct evconnlistener *m_EventListener = nullptr;
-    struct event *m_EventSignal = nullptr;
+    struct event_base *     m_EventBase = nullptr;
+    struct evconnlistener * m_EventListener = nullptr;
+    struct event *          m_EventSignal = nullptr;
 
     static void EventListenerCallback(struct evconnlistener *listener,
                                       evutil_socket_t fd,

@@ -37,39 +37,50 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
 
     struct sockaddr_in *addr_in = (struct sockaddr_in *) sa;
     char *ip_address = inet_ntoa(addr_in->sin_addr);
-    if (pSvrCore->m_DebugMode) {
+    if (pSvrCore->m_debugMode) {
         std::cout << "Client: " << ip_address << std::endl;
     }
     LOG(INFO) << "Client connecting: " << ip_address;
 
     bev_new_conn = bufferevent_socket_new(pSvrCore->m_EventBase, fd, BEV_OPT_CLOSE_ON_FREE);
     if (!bev_new_conn) {
-        if (pSvrCore->m_DebugMode) {
+        if (pSvrCore->m_debugMode) {
             std::cerr << "Error constructing bufferevent!" << std::endl;
         }
         event_base_loopbreak(pSvrCore->m_EventBase);
         return;
     }
 
-    // bind read and write function for new connection
-    bufferevent_setcb(bev_new_conn, EventConnReadCallback, EventConnWriteCallback, EventConnEventCallback, user_data);
-    bufferevent_enable(bev_new_conn, EV_READ | EV_WRITE);
+    if (fork()) {
+        /* In parent */
+        bufferevent_free(bev_new_conn);
+    } else {
+        pSvrCore->m_forkMode = true;
 
-    // create a protobuf message for client
-    TimeStamp timeStamp;
-    timeStamp.set_time(GetCurrentTime("%Y%m%d%H%M%S"));
+        /* child process need to reinit event base object  */
+        event_reinit(pSvrCore->m_EventBase);
 
-    struct timespec ts = {0};
-    clock_gettime(CLOCK_REALTIME, &ts);
-    timeStamp.set_tick(ts.tv_nsec);
+        // bind read and write function for new connection
+        bufferevent_setcb(bev_new_conn, EventConnReadCallback, EventConnWriteCallback, EventConnEventCallback,
+                          user_data);
+        bufferevent_enable(bev_new_conn, EV_READ | EV_WRITE);
 
-    //format data to string
-    std::cout << "Send message to client: \n" << FormatObject(timeStamp) << std::endl;
+        // create a protobuf message for client
+        TimeStamp timeStamp;
+        timeStamp.set_time(GetCurrentTime("%Y%m%d%H%M%S"));
 
-    //send a protobuf message to client
-    stlstring timeTextBuf;
-    if (timeStamp.SerializeToString(&timeTextBuf)) {
-        bufferevent_write(bev_new_conn, timeTextBuf.data(), timeTextBuf.size());
+        struct timespec ts = {0};
+        clock_gettime(CLOCK_REALTIME, &ts);
+        timeStamp.set_tick(ts.tv_nsec);
+
+        //format data to string
+        std::cout << "Send message to client: \n" << FormatObject(timeStamp) << std::endl;
+
+        //send a protobuf message to client
+        stlstring timeTextBuf;
+        if (timeStamp.SerializeToString(&timeTextBuf)) {
+            bufferevent_write(bev_new_conn, timeTextBuf.data(), timeTextBuf.size());
+        }
     }
 }
 
@@ -83,7 +94,7 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
     }
 
     // read client data from socket
-    if (pSvrCore->m_DebugMode) {
+    if (pSvrCore->m_debugMode) {
         std::cout << "Recv data from client: " << evbuff_size << std::endl;
     }
 
@@ -91,14 +102,14 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
     if (NULL != heart_buff) {
         memset(heart_buff, 0, evbuff_size + 1);
         if (0 < bufferevent_read(bev, heart_buff, evbuff_size)) {
-            if (pSvrCore->m_DebugMode) {
+            if (pSvrCore->m_debugMode) {
                 std::cout << "Recv data from client: " << evbuff_size << "[done]" << std::endl;
             }
 
             HeartMsg heart_msg;
             if (heart_msg.ParseFromString(heart_buff)) {
                 std::cout << "Read message from client: \n" << FormatObject(heart_msg) << std::endl;
-            } else if (pSvrCore->m_DebugMode) {
+            } else if (pSvrCore->m_debugMode) {
                 std::cout << "Recv data from client: parse fail." << std::endl;
             }
 
@@ -106,7 +117,7 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
         }
 
         free(heart_buff);
-    } else if (pSvrCore->m_DebugMode) {
+    } else if (pSvrCore->m_debugMode) {
         std::cout << "Recv data from client: alloc memory fail." << std::endl;
     }
 
@@ -126,7 +137,7 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
         std::cout << "Send message to client: \n" << FormatObject(time_stamp) << std::endl;
 
         LOG(INFO) << "Send data to client: "  << evbuff_size;
-    } else if (pSvrCore->m_DebugMode) {
+    } else if (pSvrCore->m_debugMode) {
         std::cout << "Send message to client: serialize failed." << std::endl;
     }
 }
@@ -137,7 +148,7 @@ void ServerCore::EventConnWriteCallback(struct bufferevent *bev, void *user_data
 
     struct evbuffer *output = bufferevent_get_output(bev);
     if (evbuffer_get_length(output) == 0) {
-        if (pSvrCore->m_DebugMode) {
+        if (pSvrCore->m_debugMode) {
             std::cout << "flushed answer===================================" << std::endl << std::endl;
         }
 
@@ -146,14 +157,21 @@ void ServerCore::EventConnWriteCallback(struct bufferevent *bev, void *user_data
 }
 
 void ServerCore::EventConnEventCallback(struct bufferevent *bev, short events, void *user_data) {
+    ServerCore * pSvrCore = (ServerCore*)user_data;
+
     if (events & BEV_EVENT_CONNECTED) {
         std::cout << "Connection created." << std::endl;
     } else if (events & BEV_EVENT_EOF) {
         std::cout << "Connection closed." << std::endl;
+
+        // exit forked process when client close connection
+        if (pSvrCore->m_forkMode)
+        {
+            event_base_loopbreak(pSvrCore->m_EventBase);
+        }
     } else if (events & BEV_EVENT_ERROR) {
         std::cerr << "Got an error on the connection: " << strerror(errno) << std::endl;/*XXX win32*/
         bufferevent_free(bev);
-
         LOG(ERROR) << "Found error, close connection: " << strerror(errno);
     }
 
@@ -165,7 +183,7 @@ void ServerCore::EventConnEventCallback(struct bufferevent *bev, short events, v
 void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *user_data) {
     ServerCore * pSvrCore = (ServerCore*)user_data;
 
-    if (pSvrCore->m_DebugMode) {
+    if (pSvrCore->m_debugMode) {
         std::cout << std::endl << "Caught an interrupt signal; exiting cleanly in two seconds." << std::endl;
     }
     LOG(INFO) << "SIGINT activated, exit server";
@@ -175,7 +193,7 @@ void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *us
 }
 
 ServerCore::ServerCore(bool debug) {
-    m_DebugMode = debug;
+    m_debugMode = debug;
 
     // Verify that the version of the library that we linked against is
     // compatible with the version of the headers we compiled against.
@@ -222,7 +240,7 @@ bool ServerCore::Initialize(const stlstring ip, uint32_t port) {
 
     // register signal handler
     m_EventSignal = evsignal_new(m_EventBase, SIGINT, ServerCore::EventSignalCallback, this);
-    if (!m_EventSignal || event_add(m_EventSignal, NULL) < 0) {
+    if (!m_EventSignal || evsignal_add(m_EventSignal, NULL) < 0) {
         return false;
     }
     LOG(INFO) << "Register signal SIGINT";
