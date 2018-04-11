@@ -24,6 +24,7 @@
 #include <google/protobuf/text_format.h>
 #include <event.h>
 #include "glog/logging.h"
+#include <sys/wait.h>
 
 using std::fstream;
 
@@ -183,13 +184,39 @@ void ServerCore::EventConnEventCallback(struct bufferevent *bev, short events, v
 void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *user_data) {
     ServerCore * pSvrCore = (ServerCore*)user_data;
 
-    if (pSvrCore->m_debugMode) {
-        std::cout << std::endl << "Caught an interrupt signal; exiting cleanly in two seconds." << std::endl;
-    }
-    LOG(INFO) << "SIGINT activated, exit server";
+    switch (sig)
+    {
+        case SIGINT:
+        {
+            if (pSvrCore->m_debugMode) {
+                std::cout << std::endl << "Caught an interrupt signal; exiting cleanly in two seconds." << std::endl;
+            }
+            LOG(INFO) << "SIGINT activated, exit server";
 
-    struct timeval delay = {2, 0};
-    event_base_loopexit(pSvrCore->m_EventBase, &delay);
+            struct timeval delay = {2, 0};
+            event_base_loopexit(pSvrCore->m_EventBase, &delay);
+
+            break;
+        }
+
+        case SIGCHLD:
+        {
+            pid_t pid;
+            int status;
+
+            while ((pid = waitpid(-1, &status, WNOHANG)) != -1) {
+                /* Handle the death of pid p */
+                std::cout << "Child process closed: " << pid << std::endl;
+                LOG(INFO) << "Child process closed: " << pid;
+            }
+            break;
+        }
+
+        default:
+            // do nonthing
+            break;
+    }
+
 }
 
 ServerCore::ServerCore(bool debug) {
@@ -244,6 +271,12 @@ bool ServerCore::Initialize(const stlstring ip, uint32_t port) {
         return false;
     }
     LOG(INFO) << "Register signal SIGINT";
+
+    m_EventSignalChild = evsignal_new(m_EventBase, SIGCHLD, ServerCore::EventSignalCallback, this);
+    if (!m_EventSignalChild || evsignal_add(m_EventSignalChild, NULL) < 0) {
+        return false;
+    }
+    LOG(INFO) << "Register signal SIGCHLD";
 
     return  true;
 }

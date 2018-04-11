@@ -37,6 +37,7 @@ private:
     struct event_base *     m_EventBase = nullptr;
     struct evconnlistener * m_EventListener = nullptr;
     struct event *          m_EventSignal = nullptr;
+    struct event *          m_EventSignalChild = nullptr;
 
     static void EventListenerCallback(struct evconnlistener *listener,
                                       evutil_socket_t fd,
@@ -55,6 +56,7 @@ private:
     static stlstring GetCurrentTime(const stlstring &fmt = "%Y%m%d%H%M%S");
 
     static stlstring FormatObject(const Message & message);
+
 public:
     ServerCore(bool debug = false);
     bool Initialize(const stlstring ip = "127.0.0.1", uint32_t port = 9999);
