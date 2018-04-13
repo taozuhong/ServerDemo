@@ -14,7 +14,6 @@
 *************************************************************************/
 
 #include "ServerCore.h"
-#include "TimeSchema.pb.h"
 
 #include <signal.h>
 #include <arpa/inet.h>
@@ -67,21 +66,25 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
         bufferevent_enable(bev_new_conn, EV_READ | EV_WRITE);
 
         // create a protobuf message for client
-        TimeStamp timeStamp;
-        timeStamp.set_time(GetCurrentTime("%Y%m%d%H%M%S"));
+        CltSvrPkg clientPkg;
+        BuildPackage(clientPkg, CmdActions::CMD_TIME);
+        clientPkg.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
 
         struct timespec ts = {0};
         clock_gettime(CLOCK_REALTIME, &ts);
-        timeStamp.set_tick(ts.tv_nsec);
-
-        //format data to string
-        std::cout << "Send message to client: \n" << FormatObject(timeStamp) << std::endl;
+        clientPkg.mutable_data()->mutable_time()->set_tick(ts.tv_nsec);
 
         //send a protobuf message to client
         stlstring timeTextBuf;
-        if (timeStamp.SerializeToString(&timeTextBuf)) {
+        if (clientPkg.SerializeToString(&timeTextBuf)) {
             bufferevent_write(bev_new_conn, timeTextBuf.data(), timeTextBuf.size());
+
+            //format data to string
+            std::cout << "Send message to client: " << timeTextBuf.size() << std::endl
+                      << FormatObject(clientPkg) << std::endl;
         }
+
+        LOG(INFO) << "Register callback for connection";
     }
 }
 
@@ -107,9 +110,11 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
                 std::cout << "Recv data from client: " << evbuff_size << "[done]" << std::endl;
             }
 
-            HeartMsg heart_msg;
-            if (heart_msg.ParseFromString(heart_buff)) {
-                std::cout << "Read message from client: \n" << FormatObject(heart_msg) << std::endl;
+            CltSvrPkg clientPkg;
+            clientPkg.default_instance();
+            clientPkg.mutable_data()->mutable_heart()->set_tick(0);
+            if (clientPkg.ParseFromArray(heart_buff, evbuff_size)) {
+                std::cout << "Read message from client: \n" << FormatObject(clientPkg) << std::endl;
             } else if (pSvrCore->m_debugMode) {
                 std::cout << "Recv data from client: parse fail." << std::endl;
             }
@@ -124,18 +129,20 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
 
 
     // create a protobuf message for client
-    TimeStamp time_stamp;
-    time_stamp.set_time(GetCurrentTime("%Y%m%d%H%M%S"));
+    CltSvrPkg svrTimePkg;
+    BuildPackage(svrTimePkg, CmdActions::CMD_TIME);
+    svrTimePkg.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
 
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
-    time_stamp.set_tick(ts.tv_nsec);
+    svrTimePkg.mutable_data()->mutable_time()->set_tick(ts.tv_nsec);
 
     //send a protobuf message to client
     stlstring timeTextBuf;
-    if (time_stamp.SerializeToString(&timeTextBuf)) {
+    if (svrTimePkg.SerializeToString(&timeTextBuf)) {
         bufferevent_write(bev, timeTextBuf.data(), timeTextBuf.size());
-        std::cout << "Send message to client: \n" << FormatObject(time_stamp) << std::endl;
+        std::cout << "Send message to client: " << timeTextBuf.size() << std::endl
+                  << FormatObject(svrTimePkg) << std::endl;
 
         LOG(INFO) << "Send data to client: "  << evbuff_size;
     } else if (pSvrCore->m_debugMode) {
@@ -168,6 +175,7 @@ void ServerCore::EventConnEventCallback(struct bufferevent *bev, short events, v
         // exit forked process when client close connection
         if (pSvrCore->m_forkMode)
         {
+            bufferevent_free(bev);
             event_base_loopbreak(pSvrCore->m_EventBase);
         }
     } else if (events & BEV_EVENT_ERROR) {
@@ -204,10 +212,15 @@ void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *us
             pid_t pid;
             int status;
 
+            // kill zombie process
             while ((pid = waitpid(-1, &status, WNOHANG)) != -1) {
                 /* Handle the death of pid p */
-                std::cout << "Child process closed: " << pid << std::endl;
-                LOG(INFO) << "Child process closed: " << pid;
+                if (0 != pid) {
+                    std::cout << "Child process closed: " << pid << std::endl;
+                    LOG(INFO) << "Child process closed: " << pid;
+                } else {
+                    break;
+                }
             }
             break;
         }
@@ -310,3 +323,43 @@ stlstring ServerCore::FormatObject(const Message &message) {
 
     return formatedText;
 }
+
+CltSvrPkg &ServerCore::BuildPackage(CltSvrPkg &pkg, CmdActions actions) {
+    pkg.default_instance();
+    PkgHead *pHead = pkg.mutable_head();
+    PkgBody *pBody = pkg.mutable_data();
+    pHead->set_cmd(CmdActions::CMD_HEART);
+    pHead->set_cmdseq(0);
+    pHead->set_cmdtype(0);
+    pHead->set_srcid(1);
+    pHead->set_dstid(2);
+
+
+    HeartMsg * pHeartMsg = nullptr;
+    TimeStamp * pTime = nullptr;
+    BroadMsg * pBroad = nullptr;
+    switch (actions) {
+        case CmdActions::CMD_HEART :
+        {
+            pHeartMsg = pBody->mutable_heart();
+            pHead->set_cmd(CmdActions::CMD_HEART);
+            pHeartMsg->set_tick(0);
+            break;
+        }
+        case CmdActions::CMD_TIME:
+            pTime = pBody->mutable_time();
+            pHead->set_cmd(CmdActions::CMD_TIME);
+            pTime->set_tick(0);
+            break;
+        case CmdActions::CMD_BROAD:
+            pBroad = pBody->mutable_info();
+            pHead->set_cmd(CmdActions::CMD_BROAD);
+            pBroad->set_timestamp(0);
+            break;
+        default:
+            break;
+    }
+
+    return  pkg;
+}
+

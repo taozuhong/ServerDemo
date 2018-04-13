@@ -23,7 +23,8 @@
 #include <iostream>
 #include <string>
 #include "TimeSchema.pb.h"
-#include "google/protobuf/text_format.h"
+#include <google/protobuf/text_format.h>
+
 
 static const int PORT = 9999;
 static const char IP[] = "127.0.0.1";
@@ -57,17 +58,27 @@ int main(int argc, char* argv[])
 
 
     // create and initialize HeartMsg
-    HeartMsg heart_client;
+    CltSvrPkg heartPkg;
+    heartPkg.default_instance();
+    heartPkg.mutable_head()->set_cmd(CmdActions::CMD_HEART);
+    heartPkg.mutable_head()->set_cmdseq(0);
+    heartPkg.mutable_head()->set_cmdtype(0);
+    heartPkg.mutable_head()->set_srcid(1);
+    heartPkg.mutable_head()->set_dstid(2);
+
+
+    HeartMsg * pHeartMsg = heartPkg.mutable_data()->mutable_heart();
+    pHeartMsg->set_uid(random());
+
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
-    heart_client.set_tick(ts.tv_nsec);
-
 
     // alloc buffer for HeartMsg serialize
     string heartTextBuf;
 
     // read user input and receive server message
-    TimeStamp time_server;
+    CltSvrPkg timeSvrPkg;
+    timeSvrPkg.default_instance();
     string str_text_format;
     ssize_t recv_size = 0;
     char client_buffer[1024];
@@ -79,10 +90,11 @@ int main(int argc, char* argv[])
         if (0 < recv_size)
         {
             std::cout << "Recv server data: " << recv_size << std::endl;
-            if (time_server.ParseFromString(client_buffer))
+            timeSvrPkg.mutable_data()->mutable_time()->set_tick(0);
+            if (timeSvrPkg.ParseFromArray(client_buffer, recv_size))
             {
                 str_text_format.clear();
-                TextFormat::PrintToString(time_server, &str_text_format);
+                TextFormat::PrintToString(timeSvrPkg, &str_text_format);
                 std::cout << str_text_format << std::endl;
             } else {
                 std::cout << "Recv server data: parser data fail" << std::endl;
@@ -92,8 +104,8 @@ int main(int argc, char* argv[])
 
             // update client tick to server
             clock_gettime(CLOCK_REALTIME, &ts);
-            heart_client.set_tick(ts.tv_nsec);
-            if (heart_client.SerializeToString(&heartTextBuf)) {
+            pHeartMsg->set_tick(ts.tv_nsec);
+            if (heartPkg.SerializeToString(&heartTextBuf)) {
                 if (-1 == send(fd, heartTextBuf.data(), heartTextBuf.size(), 0)) {
                     break;
                 }
@@ -103,7 +115,7 @@ int main(int argc, char* argv[])
             }
 
             str_text_format.clear();
-            TextFormat::PrintToString(heart_client, &str_text_format);
+            TextFormat::PrintToString(heartPkg, &str_text_format);
             std::cout << str_text_format << std::endl;
         } else if (-1 == recv_size) {
             std::cout << "Recv server data: " << strerror(errno) << std::endl;

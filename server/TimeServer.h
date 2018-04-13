@@ -23,6 +23,7 @@ Demo server app to use libevent protobuf gflags glog\n\
 \n\
 OPTIONS: \n\
 -h                Show help \n\
+-debug            Enter debug mode\n\
 -ip=<ip address>  The ip address \n\
 -port=[port]      The listen port \n\
 \n\

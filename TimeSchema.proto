@@ -7,5 +7,39 @@ message TimeStamp {
 
 message HeartMsg {
     required uint32 Tick = 1;
+    required uint64 UID = 2;
 }
 
+message BroadMsg {
+    required string Title = 1;
+    required string Message = 2;
+    optional uint64 TimeStamp = 3 [default = 0];
+}
+
+message PkgHead {
+    required CmdActions Cmd = 1 [default = CMD_HEART];
+    required uint32 CmdType = 2;
+    required uint32 CmdSeq = 3;
+    required uint32 SrcID = 4;
+    required uint32 DstID = 5;
+}
+
+message PkgBody {
+    oneof Body {
+        TimeStamp Time = 1;
+        HeartMsg Heart = 2;
+        BroadMsg Info = 3;
+    };
+}
+
+enum CmdActions {
+  CMD_UNKNOWN = 0;
+  CMD_TIME = 1;
+  CMD_HEART = 2;
+  CMD_BROAD = 3;
+}
+
+message CltSvrPkg {
+    required PkgHead Head = 1;
+    required PkgBody Data = 2;
+}

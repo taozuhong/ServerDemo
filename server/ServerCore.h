@@ -22,11 +22,14 @@
 #include <event2/util.h>
 #include <event2/event.h>
 #include <google/protobuf/message.h>
-
 #include <string>
+#include <unordered_map>
+#include "TimeSchema.pb.h"
 
 using google::protobuf::Message;
+typedef std::unordered_map<uint64_t, struct bufferevent *> UserConnMap;
 typedef std::string stlstring;
+
 
 class ServerCore {
 private:
@@ -38,6 +41,9 @@ private:
     struct evconnlistener * m_EventListener = nullptr;
     struct event *          m_EventSignal = nullptr;
     struct event *          m_EventSignalChild = nullptr;
+    UserConnMap             m_UserConnectionMap;
+
+    static CltSvrPkg & BuildPackage(CltSvrPkg & pkg, CmdActions actions = CmdActions::CMD_HEART);
 
     static void EventListenerCallback(struct evconnlistener *listener,
                                       evutil_socket_t fd,
