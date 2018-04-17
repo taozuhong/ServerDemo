@@ -60,15 +60,14 @@ int main(int argc, char* argv[])
     // create and initialize HeartMsg
     CltSvrPkg heartPkg;
     heartPkg.default_instance();
+    HeartMsg * pHeartMsg = nullptr;
     heartPkg.mutable_head()->set_cmd(CmdActions::CMD_HEART);
     heartPkg.mutable_head()->set_cmdseq(0);
     heartPkg.mutable_head()->set_cmdtype(0);
     heartPkg.mutable_head()->set_srcid(1);
     heartPkg.mutable_head()->set_dstid(2);
-
-
-    HeartMsg * pHeartMsg = heartPkg.mutable_data()->mutable_heart();
-    pHeartMsg->set_uid(random());
+    heartPkg.mutable_head()->set_uid(0);
+    pHeartMsg = heartPkg.mutable_data()->mutable_heart();
 
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -81,6 +80,8 @@ int main(int argc, char* argv[])
     timeSvrPkg.default_instance();
     string str_text_format;
     ssize_t recv_size = 0;
+    ssize_t user_input = 0;
+    uint64_t server_user_id = 0;
     char client_buffer[1024];
     while (true)
     {
@@ -93,6 +94,12 @@ int main(int argc, char* argv[])
             timeSvrPkg.mutable_data()->mutable_time()->set_tick(0);
             if (timeSvrPkg.ParseFromArray(client_buffer, recv_size))
             {
+                if (0 == server_user_id)
+                {
+                    server_user_id = timeSvrPkg.head().uid();
+                    heartPkg.mutable_head()->set_uid(server_user_id);
+                }
+
                 str_text_format.clear();
                 TextFormat::PrintToString(timeSvrPkg, &str_text_format);
                 std::cout << str_text_format << std::endl;
@@ -100,7 +107,12 @@ int main(int argc, char* argv[])
                 std::cout << "Recv server data: parser data fail" << std::endl;
             }
 
-            getchar();
+            user_input = getchar();
+            if (('q' == user_input) || ('Q' == user_input))
+            {
+                std::cout << "safe exit client." << std::endl;
+                break;
+            }
 
             // update client tick to server
             clock_gettime(CLOCK_REALTIME, &ts);

@@ -216,7 +216,7 @@ class HeartMsg : public ::google::protobuf::Message {
   inline ::google::protobuf::uint32 tick() const;
   inline void set_tick(::google::protobuf::uint32 value);
 
-  // required uint64 UID = 2;
+  // optional uint64 UID = 2 [default = 0];
   inline bool has_uid() const;
   inline void clear_uid();
   static const int kUIDFieldNumber = 2;
@@ -442,6 +442,13 @@ class PkgHead : public ::google::protobuf::Message {
   inline ::google::protobuf::uint32 dstid() const;
   inline void set_dstid(::google::protobuf::uint32 value);
 
+  // required uint64 UID = 6;
+  inline bool has_uid() const;
+  inline void clear_uid();
+  static const int kUIDFieldNumber = 6;
+  inline ::google::protobuf::uint64 uid() const;
+  inline void set_uid(::google::protobuf::uint64 value);
+
   // @@protoc_insertion_point(class_scope:PkgHead)
  private:
   inline void set_has_cmd();
@@ -454,6 +461,8 @@ class PkgHead : public ::google::protobuf::Message {
   inline void clear_has_srcid();
   inline void set_has_dstid();
   inline void clear_has_dstid();
+  inline void set_has_uid();
+  inline void clear_has_uid();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
@@ -463,6 +472,7 @@ class PkgHead : public ::google::protobuf::Message {
   ::google::protobuf::uint32 cmdtype_;
   ::google::protobuf::uint32 cmdseq_;
   ::google::protobuf::uint32 srcid_;
+  ::google::protobuf::uint64 uid_;
   ::google::protobuf::uint32 dstid_;
   friend void  protobuf_AddDesc_TimeSchema_2eproto();
   friend void protobuf_AssignDesc_TimeSchema_2eproto();
@@ -817,7 +827,7 @@ inline void HeartMsg::set_tick(::google::protobuf::uint32 value) {
   // @@protoc_insertion_point(field_set:HeartMsg.Tick)
 }
 
-// required uint64 UID = 2;
+// optional uint64 UID = 2 [default = 0];
 inline bool HeartMsg::has_uid() const {
   return (_has_bits_[0] & 0x00000002u) != 0;
 }
@@ -1144,6 +1154,30 @@ inline void PkgHead::set_dstid(::google::protobuf::uint32 value) {
   set_has_dstid();
   dstid_ = value;
   // @@protoc_insertion_point(field_set:PkgHead.DstID)
+}
+
+// required uint64 UID = 6;
+inline bool PkgHead::has_uid() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void PkgHead::set_has_uid() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void PkgHead::clear_has_uid() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void PkgHead::clear_uid() {
+  uid_ = GOOGLE_ULONGLONG(0);
+  clear_has_uid();
+}
+inline ::google::protobuf::uint64 PkgHead::uid() const {
+  // @@protoc_insertion_point(field_get:PkgHead.UID)
+  return uid_;
+}
+inline void PkgHead::set_uid(::google::protobuf::uint64 value) {
+  set_has_uid();
+  uid_ = value;
+  // @@protoc_insertion_point(field_set:PkgHead.UID)
 }
 
 // -------------------------------------------------------------------

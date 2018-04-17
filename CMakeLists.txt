@@ -15,7 +15,7 @@ ADD_EXECUTABLE(timesvr
         TimeSchema.pb.cc
         TimeSchema.pb.h
         server/TimeServer.cc
-        server/ServerCore.cpp
+        server/ServerCore.cc
         server/ServerCore.h
         server/TimeServer.h)
 

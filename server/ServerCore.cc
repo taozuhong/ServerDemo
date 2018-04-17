@@ -51,6 +51,7 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
         return;
     }
 
+
     if (fork()) {
         /* In parent */
         bufferevent_free(bev_new_conn);
@@ -60,14 +61,18 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
         /* child process need to reinit event base object  */
         event_reinit(pSvrCore->m_EventBase);
 
+
         // bind read and write function for new connection
         bufferevent_setcb(bev_new_conn, EventConnReadCallback, EventConnWriteCallback, EventConnEventCallback,
                           user_data);
         bufferevent_enable(bev_new_conn, EV_READ | EV_WRITE);
 
-        // create a protobuf message for client
+        // create a protobuf message for client (create user id)
         CltSvrPkg clientPkg;
         BuildPackage(clientPkg, CmdActions::CMD_TIME);
+        uint64_t user_id = random();
+        pSvrCore->m_UserConnectionMap[user_id] = bev_new_conn;
+        clientPkg.mutable_head()->set_uid(user_id);
         clientPkg.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
 
         struct timespec ts = {0};
@@ -115,6 +120,9 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
             clientPkg.mutable_data()->mutable_heart()->set_tick(0);
             if (clientPkg.ParseFromArray(heart_buff, evbuff_size)) {
                 std::cout << "Read message from client: \n" << FormatObject(clientPkg) << std::endl;
+
+                // Make response for client
+                pSvrCore->HandleMessageAndResponse(clientPkg);
             } else if (pSvrCore->m_debugMode) {
                 std::cout << "Recv data from client: parse fail." << std::endl;
             }
@@ -128,6 +136,7 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
     }
 
 
+/*
     // create a protobuf message for client
     CltSvrPkg svrTimePkg;
     BuildPackage(svrTimePkg, CmdActions::CMD_TIME);
@@ -148,6 +157,7 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
     } else if (pSvrCore->m_debugMode) {
         std::cout << "Send message to client: serialize failed." << std::endl;
     }
+*/
 }
 
 
@@ -215,7 +225,7 @@ void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *us
             // kill zombie process
             while ((pid = waitpid(-1, &status, WNOHANG)) != -1) {
                 /* Handle the death of pid p */
-                if (0 != pid) {
+                if ((-1 != pid) && WIFSIGNALED(status) && WTERMSIG(status)) {
                     std::cout << "Child process closed: " << pid << std::endl;
                     LOG(INFO) << "Child process closed: " << pid;
                 } else {
@@ -333,6 +343,7 @@ CltSvrPkg &ServerCore::BuildPackage(CltSvrPkg &pkg, CmdActions actions) {
     pHead->set_cmdtype(0);
     pHead->set_srcid(1);
     pHead->set_dstid(2);
+    pHead->set_uid(0);
 
 
     HeartMsg * pHeartMsg = nullptr;
@@ -346,20 +357,87 @@ CltSvrPkg &ServerCore::BuildPackage(CltSvrPkg &pkg, CmdActions actions) {
             pHeartMsg->set_tick(0);
             break;
         }
-        case CmdActions::CMD_TIME:
+        case CmdActions::CMD_TIME: {
             pTime = pBody->mutable_time();
             pHead->set_cmd(CmdActions::CMD_TIME);
             pTime->set_tick(0);
             break;
-        case CmdActions::CMD_BROAD:
+        }
+        case CmdActions::CMD_BROAD: {
             pBroad = pBody->mutable_info();
             pHead->set_cmd(CmdActions::CMD_BROAD);
             pBroad->set_timestamp(0);
             break;
+        }
         default:
             break;
     }
 
     return  pkg;
+}
+
+void ServerCore::HandleMessageAndResponse(CltSvrPkg & pkg) {
+    uint64_t user_id = pkg.head().uid();
+    bufferevent * buffevent = m_UserConnectionMap[user_id];
+    if (NULL == buffevent)
+    {
+        LOG(INFO) << "User id and connection is null";
+        return;
+    }
+
+    struct timespec ts = {0};
+    CltSvrPkg server_response;
+    switch (pkg.head().cmd())
+    {
+        case CmdActions::CMD_TIME: {
+            BuildPackage(server_response, CmdActions::CMD_TIME);
+            server_response.mutable_head()->set_uid(user_id);
+            server_response.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
+            clock_gettime(CLOCK_REALTIME, &ts);
+            server_response.mutable_data()->mutable_time()->set_tick(ts.tv_nsec);
+            BufferEventSendResponse(buffevent, server_response);
+            break;
+        }
+        case CmdActions::CMD_HEART: {
+            BuildPackage(server_response, CmdActions::CMD_HEART);
+            server_response.mutable_head()->set_uid(user_id);
+            clock_gettime(CLOCK_REALTIME, &ts);
+            server_response.mutable_data()->mutable_heart()->set_tick(ts.tv_nsec);
+            BufferEventSendResponse(buffevent, server_response);
+            break;
+        }
+        case CmdActions::CMD_BROAD: {
+            BuildPackage(server_response, CmdActions::CMD_BROAD);
+            server_response.mutable_head()->set_uid(user_id);
+            clock_gettime(CLOCK_REALTIME, &ts);
+            server_response.mutable_data()->mutable_info()->set_timestamp(ts.tv_nsec);
+            server_response.mutable_data()->mutable_info()->set_title(pkg.data().info().title());
+            server_response.mutable_data()->mutable_info()->set_message(pkg.data().info().message());
+            for (auto it : m_UserConnectionMap)
+            {
+                if (it.first != user_id) {
+                    BufferEventSendResponse(buffevent, server_response);
+                }
+            }
+            break;
+        }
+        case CmdActions::CMD_UNKNOWN:
+            break;
+        default:
+            break;
+    }
+}
+
+void ServerCore::BufferEventSendResponse(struct bufferevent *buffevent, CltSvrPkg & response) {
+    stlstring timeTextBuf;
+    if (response.SerializeToString(&timeTextBuf)) {
+        bufferevent_write(buffevent, timeTextBuf.data(), timeTextBuf.size());
+        std::cout << "Send message to client: " << timeTextBuf.size() << std::endl
+                  << FormatObject(response) << std::endl;
+
+        LOG(INFO) << "Send data to client: " << timeTextBuf.size();
+    } else if (m_debugMode) {
+        std::cout << "Send message to client: serialize failed." << std::endl;
+    }
 }
 

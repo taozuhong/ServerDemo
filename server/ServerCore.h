@@ -63,6 +63,9 @@ private:
 
     static stlstring FormatObject(const Message & message);
 
+    void HandleMessageAndResponse(CltSvrPkg & pkg);
+    void BufferEventSendResponse(struct bufferevent *buffevent, CltSvrPkg & response);
+
 public:
     ServerCore(bool debug = false);
     bool Initialize(const stlstring ip = "127.0.0.1", uint32_t port = 9999);

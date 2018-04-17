@@ -102,12 +102,13 @@ void protobuf_AssignDesc_TimeSchema_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(BroadMsg));
   PkgHead_descriptor_ = file->message_type(3);
-  static const int PkgHead_offsets_[5] = {
+  static const int PkgHead_offsets_[6] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PkgHead, cmd_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PkgHead, cmdtype_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PkgHead, cmdseq_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PkgHead, srcid_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PkgHead, dstid_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PkgHead, uid_),
   };
   PkgHead_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -209,18 +210,19 @@ void protobuf_AddDesc_TimeSchema_2eproto() {
 
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
     "\n\020TimeSchema.proto\"\'\n\tTimeStamp\022\014\n\004Time\030"
-    "\001 \002(\t\022\014\n\004Tick\030\002 \002(\004\"%\n\010HeartMsg\022\014\n\004Tick\030"
-    "\001 \002(\r\022\013\n\003UID\030\002 \002(\004\"@\n\010BroadMsg\022\r\n\005Title\030"
-    "\001 \002(\t\022\017\n\007Message\030\002 \002(\t\022\024\n\tTimeStamp\030\003 \001("
-    "\004:\0010\"m\n\007PkgHead\022#\n\003Cmd\030\001 \002(\0162\013.CmdAction"
-    "s:\tCMD_HEART\022\017\n\007CmdType\030\002 \002(\r\022\016\n\006CmdSeq\030"
-    "\003 \002(\r\022\r\n\005SrcID\030\004 \002(\r\022\r\n\005DstID\030\005 \002(\r\"d\n\007P"
-    "kgBody\022\032\n\004Time\030\001 \001(\0132\n.TimeStampH\000\022\032\n\005He"
-    "art\030\002 \001(\0132\t.HeartMsgH\000\022\031\n\004Info\030\003 \001(\0132\t.B"
-    "roadMsgH\000B\006\n\004Body\";\n\tCltSvrPkg\022\026\n\004Head\030\001"
-    " \002(\0132\010.PkgHead\022\026\n\004Data\030\002 \002(\0132\010.PkgBody*I"
-    "\n\nCmdActions\022\017\n\013CMD_UNKNOWN\020\000\022\014\n\010CMD_TIM"
-    "E\020\001\022\r\n\tCMD_HEART\020\002\022\r\n\tCMD_BROAD\020\003", 513);
+    "\001 \002(\t\022\014\n\004Tick\030\002 \002(\004\"(\n\010HeartMsg\022\014\n\004Tick\030"
+    "\001 \002(\r\022\016\n\003UID\030\002 \001(\004:\0010\"@\n\010BroadMsg\022\r\n\005Tit"
+    "le\030\001 \002(\t\022\017\n\007Message\030\002 \002(\t\022\024\n\tTimeStamp\030\003"
+    " \001(\004:\0010\"z\n\007PkgHead\022#\n\003Cmd\030\001 \002(\0162\013.CmdAct"
+    "ions:\tCMD_HEART\022\017\n\007CmdType\030\002 \002(\r\022\016\n\006CmdS"
+    "eq\030\003 \002(\r\022\r\n\005SrcID\030\004 \002(\r\022\r\n\005DstID\030\005 \002(\r\022\013"
+    "\n\003UID\030\006 \002(\004\"d\n\007PkgBody\022\032\n\004Time\030\001 \001(\0132\n.T"
+    "imeStampH\000\022\032\n\005Heart\030\002 \001(\0132\t.HeartMsgH\000\022\031"
+    "\n\004Info\030\003 \001(\0132\t.BroadMsgH\000B\006\n\004Body\";\n\tClt"
+    "SvrPkg\022\026\n\004Head\030\001 \002(\0132\010.PkgHead\022\026\n\004Data\030\002"
+    " \002(\0132\010.PkgBody*I\n\nCmdActions\022\017\n\013CMD_UNKN"
+    "OWN\020\000\022\014\n\010CMD_TIME\020\001\022\r\n\tCMD_HEART\020\002\022\r\n\tCM"
+    "D_BROAD\020\003", 529);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "TimeSchema.proto", &protobuf_RegisterTypes);
   TimeStamp::default_instance_ = new TimeStamp();
@@ -652,7 +654,7 @@ bool HeartMsg::MergePartialFromCodedStream(
         break;
       }
 
-      // required uint64 UID = 2;
+      // optional uint64 UID = 2 [default = 0];
       case 2: {
         if (tag == 16) {
          parse_UID:
@@ -697,7 +699,7 @@ void HeartMsg::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(1, this->tick(), output);
   }
 
-  // required uint64 UID = 2;
+  // optional uint64 UID = 2 [default = 0];
   if (has_uid()) {
     ::google::protobuf::internal::WireFormatLite::WriteUInt64(2, this->uid(), output);
   }
@@ -717,7 +719,7 @@ void HeartMsg::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(1, this->tick(), target);
   }
 
-  // required uint64 UID = 2;
+  // optional uint64 UID = 2 [default = 0];
   if (has_uid()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(2, this->uid(), target);
   }
@@ -741,7 +743,7 @@ int HeartMsg::ByteSize() const {
           this->tick());
     }
 
-    // required uint64 UID = 2;
+    // optional uint64 UID = 2 [default = 0];
     if (has_uid()) {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::UInt64Size(
@@ -798,7 +800,7 @@ void HeartMsg::CopyFrom(const HeartMsg& from) {
 }
 
 bool HeartMsg::IsInitialized() const {
-  if ((_has_bits_[0] & 0x00000003) != 0x00000003) return false;
+  if ((_has_bits_[0] & 0x00000001) != 0x00000001) return false;
 
   return true;
 }
@@ -1174,6 +1176,7 @@ const int PkgHead::kCmdTypeFieldNumber;
 const int PkgHead::kCmdSeqFieldNumber;
 const int PkgHead::kSrcIDFieldNumber;
 const int PkgHead::kDstIDFieldNumber;
+const int PkgHead::kUIDFieldNumber;
 #endif  // !_MSC_VER
 
 PkgHead::PkgHead()
@@ -1199,6 +1202,7 @@ void PkgHead::SharedCtor() {
   cmdseq_ = 0u;
   srcid_ = 0u;
   dstid_ = 0u;
+  uid_ = GOOGLE_ULONGLONG(0);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -1244,7 +1248,7 @@ void PkgHead::Clear() {
     ::memset(&first, 0, n);                                \
   } while (0)
 
-  if (_has_bits_[0 / 32] & 31) {
+  if (_has_bits_[0 / 32] & 63) {
     ZR_(cmdtype_, dstid_);
     cmd_ = 2;
   }
@@ -1341,6 +1345,21 @@ bool PkgHead::MergePartialFromCodedStream(
         } else {
           goto handle_unusual;
         }
+        if (input->ExpectTag(48)) goto parse_UID;
+        break;
+      }
+
+      // required uint64 UID = 6;
+      case 6: {
+        if (tag == 48) {
+         parse_UID:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::uint64, ::google::protobuf::internal::WireFormatLite::TYPE_UINT64>(
+                 input, &uid_)));
+          set_has_uid();
+        } else {
+          goto handle_unusual;
+        }
         if (input->ExpectAtEnd()) goto success;
         break;
       }
@@ -1396,6 +1415,11 @@ void PkgHead::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteUInt32(5, this->dstid(), output);
   }
 
+  // required uint64 UID = 6;
+  if (has_uid()) {
+    ::google::protobuf::internal::WireFormatLite::WriteUInt64(6, this->uid(), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -1430,6 +1454,11 @@ void PkgHead::SerializeWithCachedSizes(
   // required uint32 DstID = 5;
   if (has_dstid()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteUInt32ToArray(5, this->dstid(), target);
+  }
+
+  // required uint64 UID = 6;
+  if (has_uid()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteUInt64ToArray(6, this->uid(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -1478,6 +1507,13 @@ int PkgHead::ByteSize() const {
           this->dstid());
     }
 
+    // required uint64 UID = 6;
+    if (has_uid()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::UInt64Size(
+          this->uid());
+    }
+
   }
   if (!unknown_fields().empty()) {
     total_size +=
@@ -1520,6 +1556,9 @@ void PkgHead::MergeFrom(const PkgHead& from) {
     if (from.has_dstid()) {
       set_dstid(from.dstid());
     }
+    if (from.has_uid()) {
+      set_uid(from.uid());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -1537,7 +1576,7 @@ void PkgHead::CopyFrom(const PkgHead& from) {
 }
 
 bool PkgHead::IsInitialized() const {
-  if ((_has_bits_[0] & 0x0000001f) != 0x0000001f) return false;
+  if ((_has_bits_[0] & 0x0000003f) != 0x0000003f) return false;
 
   return true;
 }
@@ -1549,6 +1588,7 @@ void PkgHead::Swap(PkgHead* other) {
     std::swap(cmdseq_, other->cmdseq_);
     std::swap(srcid_, other->srcid_);
     std::swap(dstid_, other->dstid_);
+    std::swap(uid_, other->uid_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);
