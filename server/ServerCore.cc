@@ -51,6 +51,12 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
         return;
     }
 
+    // Generate user id and store it
+    uint64_t user_id = random();
+    pSvrCore->m_UserID = user_id;
+    pSvrCore->m_BuffEventHandle = bev_new_conn;
+    pSvrCore->m_UserConnectionMap[user_id] = bev_new_conn;
+    std::cout << "Client user id: " << user_id << std::endl;
 
     if (fork()) {
         /* In parent */
@@ -66,12 +72,11 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
         bufferevent_setcb(bev_new_conn, EventConnReadCallback, EventConnWriteCallback, EventConnEventCallback,
                           user_data);
         bufferevent_enable(bev_new_conn, EV_READ | EV_WRITE);
+        LOG(INFO) << "Register callback for connection";
 
         // create a protobuf message for client (create user id)
         CltSvrPkg clientPkg;
         BuildPackage(clientPkg, CmdActions::CMD_TIME);
-        uint64_t user_id = random();
-        pSvrCore->m_UserConnectionMap[user_id] = bev_new_conn;
         clientPkg.mutable_head()->set_uid(user_id);
         clientPkg.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
 
@@ -87,9 +92,9 @@ void ServerCore::EventListenerCallback(struct evconnlistener *listener,
             //format data to string
             std::cout << "Send message to client: " << timeTextBuf.size() << std::endl
                       << FormatObject(clientPkg) << std::endl;
-        }
 
-        LOG(INFO) << "Register callback for connection";
+            LOG(INFO) << "Send message to client: " << user_id << "(" << timeTextBuf.size() << ")";
+        }
     }
 }
 
@@ -105,6 +110,7 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
     // read client data from socket
     if (pSvrCore->m_debugMode) {
         std::cout << "Recv data from client: " << evbuff_size << std::endl;
+        LOG(INFO) << "Receive data from client: "  << evbuff_size;
     }
 
     char *heart_buff = (char *) malloc(evbuff_size + 1);
@@ -123,41 +129,18 @@ void ServerCore::EventConnReadCallback(struct bufferevent *bev, void *user_data)
 
                 // Make response for client
                 pSvrCore->HandleMessageAndResponse(clientPkg);
+
+                LOG(INFO) << "Receive data from client: "  << clientPkg.head().uid() << "-->" << clientPkg.head().cmd();
             } else if (pSvrCore->m_debugMode) {
                 std::cout << "Recv data from client: parse fail." << std::endl;
+                LOG(INFO) << "Recv data from client: parse fail.";
             }
-
-            LOG(INFO) << "Receive data from client: "  << evbuff_size;
         }
 
         free(heart_buff);
     } else if (pSvrCore->m_debugMode) {
         std::cout << "Recv data from client: alloc memory fail." << std::endl;
     }
-
-
-/*
-    // create a protobuf message for client
-    CltSvrPkg svrTimePkg;
-    BuildPackage(svrTimePkg, CmdActions::CMD_TIME);
-    svrTimePkg.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
-
-    struct timespec ts = {0};
-    clock_gettime(CLOCK_REALTIME, &ts);
-    svrTimePkg.mutable_data()->mutable_time()->set_tick(ts.tv_nsec);
-
-    //send a protobuf message to client
-    stlstring timeTextBuf;
-    if (svrTimePkg.SerializeToString(&timeTextBuf)) {
-        bufferevent_write(bev, timeTextBuf.data(), timeTextBuf.size());
-        std::cout << "Send message to client: " << timeTextBuf.size() << std::endl
-                  << FormatObject(svrTimePkg) << std::endl;
-
-        LOG(INFO) << "Send data to client: "  << evbuff_size;
-    } else if (pSvrCore->m_debugMode) {
-        std::cout << "Send message to client: serialize failed." << std::endl;
-    }
-*/
 }
 
 
@@ -179,24 +162,24 @@ void ServerCore::EventConnEventCallback(struct bufferevent *bev, short events, v
 
     if (events & BEV_EVENT_CONNECTED) {
         std::cout << "Connection created." << std::endl;
+        LOG(INFO) << "Connection created.";
     } else if (events & BEV_EVENT_EOF) {
         std::cout << "Connection closed." << std::endl;
+        LOG(INFO) << "Connection closed.";
 
         // exit forked process when client close connection
         if (pSvrCore->m_forkMode)
         {
             bufferevent_free(bev);
             event_base_loopbreak(pSvrCore->m_EventBase);
+
+            LOG(INFO) << "Close connection and exit event loop.";
         }
     } else if (events & BEV_EVENT_ERROR) {
         std::cerr << "Got an error on the connection: " << strerror(errno) << std::endl;/*XXX win32*/
         bufferevent_free(bev);
         LOG(ERROR) << "Found error, close connection: " << strerror(errno);
     }
-
-    /* None of the other events can happen here, since we haven't enabled
-     * timeouts */
-    // bufferevent_free(bev);
 }
 
 void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *user_data) {
@@ -209,11 +192,12 @@ void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *us
             if (pSvrCore->m_debugMode) {
                 std::cout << std::endl << "Caught an interrupt signal; exiting cleanly in two seconds." << std::endl;
             }
-            LOG(INFO) << "SIGINT activated, exit server";
+            LOG(INFO) << "SIGINT activated, exit server process......";
 
             struct timeval delay = {2, 0};
             event_base_loopexit(pSvrCore->m_EventBase, &delay);
 
+            LOG(INFO) << "SIGINT activated, exit server process......[done]";
             break;
         }
 
@@ -224,7 +208,7 @@ void ServerCore::EventSignalCallback(evutil_socket_t sig, short events, void *us
 
             // kill zombie process
             while ((pid = waitpid(-1, &status, WNOHANG)) != -1) {
-                /* Handle the death of pid p */
+                /* Handle the dead process pid*/
                 if ((-1 != pid) && WIFSIGNALED(status) && WTERMSIG(status)) {
                     std::cout << "Child process closed: " << pid << std::endl;
                     LOG(INFO) << "Child process closed: " << pid;
@@ -377,9 +361,7 @@ CltSvrPkg &ServerCore::BuildPackage(CltSvrPkg &pkg, CmdActions actions) {
 }
 
 void ServerCore::HandleMessageAndResponse(CltSvrPkg & pkg) {
-    uint64_t user_id = pkg.head().uid();
-    bufferevent * buffevent = m_UserConnectionMap[user_id];
-    if (NULL == buffevent)
+    if ((0 == m_UserID) || (nullptr == m_BuffEventHandle))
     {
         LOG(INFO) << "User id and connection is null";
         return;
@@ -391,32 +373,32 @@ void ServerCore::HandleMessageAndResponse(CltSvrPkg & pkg) {
     {
         case CmdActions::CMD_TIME: {
             BuildPackage(server_response, CmdActions::CMD_TIME);
-            server_response.mutable_head()->set_uid(user_id);
+            server_response.mutable_head()->set_uid(m_UserID);
             server_response.mutable_data()->mutable_time()->set_time(GetCurrentTime("%Y%m%d%H%M%S"));
             clock_gettime(CLOCK_REALTIME, &ts);
             server_response.mutable_data()->mutable_time()->set_tick(ts.tv_nsec);
-            BufferEventSendResponse(buffevent, server_response);
+            BufferEventSendResponse(m_BuffEventHandle, server_response);
             break;
         }
         case CmdActions::CMD_HEART: {
             BuildPackage(server_response, CmdActions::CMD_HEART);
-            server_response.mutable_head()->set_uid(user_id);
+            server_response.mutable_head()->set_uid(m_UserID);
             clock_gettime(CLOCK_REALTIME, &ts);
             server_response.mutable_data()->mutable_heart()->set_tick(ts.tv_nsec);
-            BufferEventSendResponse(buffevent, server_response);
+            BufferEventSendResponse(m_BuffEventHandle, server_response);
             break;
         }
         case CmdActions::CMD_BROAD: {
             BuildPackage(server_response, CmdActions::CMD_BROAD);
-            server_response.mutable_head()->set_uid(user_id);
+            server_response.mutable_head()->set_uid(m_UserID);
             clock_gettime(CLOCK_REALTIME, &ts);
             server_response.mutable_data()->mutable_info()->set_timestamp(ts.tv_nsec);
             server_response.mutable_data()->mutable_info()->set_title(pkg.data().info().title());
             server_response.mutable_data()->mutable_info()->set_message(pkg.data().info().message());
             for (auto it : m_UserConnectionMap)
             {
-                if (it.first != user_id) {
-                    BufferEventSendResponse(buffevent, server_response);
+                if (it.first != m_UserID) {
+                    BufferEventSendResponse(m_BuffEventHandle, server_response);
                 }
             }
             break;

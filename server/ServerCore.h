@@ -42,6 +42,8 @@ private:
     struct event *          m_EventSignal = nullptr;
     struct event *          m_EventSignalChild = nullptr;
     UserConnMap             m_UserConnectionMap;
+    uint64_t                m_UserID = 0;
+    struct bufferevent *    m_BuffEventHandle = nullptr;
 
     static CltSvrPkg & BuildPackage(CltSvrPkg & pkg, CmdActions actions = CmdActions::CMD_HEART);
 
