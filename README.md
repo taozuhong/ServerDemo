@@ -17,16 +17,16 @@ On Unix-like systems with GNU Make as build tool, these build steps can be summa
 $ git clone https://github.com/taozuhong/ServerDemo.git
 $ cd ServerDemo
 
-$ echo "install libevent and protobuf"
-$ sudo yum install libevent libevent-devel protobuf protobuf-devel
+$ echo "install libevent / gflags / glog"
+$ sudo yum install libevent libevent-devel gflags gflags-devel glog glog-devel
 
-$ echo "install gflags and glog"
-$ git submodule update --init --recursive
-$ cd third_party/<module>
-$ echo "install module by module installation directive"
+$ echo "install protobuf 2.6.1"
+$ git clone -b v2.6.1 https://github.com/google/protobuf.git
+$ cd protobuf
+$ make & sudo make install & sudo ldconfig
 
-$ mkdir ServerDemo/build && cd ServerDemo/build
-$ ccmake ..
+$ mkdir ServerDemo/build && cd ServerDemo
+$ cmake CMakeLists.txt
 
   - Press 'c' to configure the build system and 'e' to ignore warnings.
   - Set CMAKE_INSTALL_PREFIX and other CMake variables and options.
